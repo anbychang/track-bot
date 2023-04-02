@@ -7,7 +7,7 @@ RIGHT = 1
 DOWN = 2
 LEFT = 3
 
-GOAL = 21
+GOAL = 20
 
 DIRS = ["UP", "RIGHT", "DOWN", "LEFT"]
 DX_DIRS = [0, 1, 0, -1]
@@ -50,7 +50,7 @@ class State:
         x: int = None,
         y: int = None,
         out_dir: int = None,
-        score: int = 0,
+        score: int = -1,
         prev: object = None,
         last_track: object = None,
     ):
@@ -61,7 +61,6 @@ class State:
             self.score = prev.x + last_track.dx
             self.x = prev.x + last_track.dx
             self.y = prev.y + last_track.dy
-            self.track_pos = []
         else:
             self.out_dir = out_dir
             self.score = score
@@ -69,7 +68,7 @@ class State:
             self.y = y
 
     def __lt__(self, other):
-        return self.score < other.score
+        return self.score > other.score  # since heapq always pops the smallest element
 
     def __str__(self):
         return f"{self.x} {self.y} {DIRS[self.out_dir]} {self.score}"
@@ -115,9 +114,9 @@ class TrackBot:
                 if self.seen(child):
                     continue
                 push(heap, child)
-            state = heap.pop()
+            state = pop(heap)
 
-        # trace
+        # back-trace
         states = []
         while state:
             states.insert(0, state)
@@ -126,7 +125,6 @@ class TrackBot:
         # draw
         self.map = [["."] * self.map_width for _ in range(self.map_height)]
         for state in states[1:]:
-            print(state.last_track)
             for cell in state.last_track.cells:
                 x = state.prev.x + cell[0]
                 y = state.prev.y + cell[1]
@@ -142,10 +140,10 @@ class TrackBot:
 
 bot = TrackBot(
     [
-        Track(1, LEFT, [DOWN, DOWN], LEFT),
-        Track(1, LEFT, [UP, UP], LEFT),
+        # Track(1, LEFT, [DOWN, DOWN], LEFT),
+        # Track(1, LEFT, [UP, UP], LEFT),
         Track(2, LEFT, [DOWN, DOWN], RIGHT),
-        Track(3, UP, [DOWN, DOWN], DOWN),
+        # Track(3, UP, [DOWN, DOWN], DOWN),
         Track(4, LEFT, [DOWN, DOWN], DOWN),
         Track(4, DOWN, [UP, UP], LEFT),
         Track(5, RIGHT, [DOWN, DOWN], DOWN),
