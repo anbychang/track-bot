@@ -7,7 +7,7 @@ RIGHT = 1
 DOWN = 2
 LEFT = 3
 
-GOAL = 36
+GOAL = 11
 
 DIRS = ["UP", "RIGHT", "DOWN", "LEFT"]
 INVERSE_DIRS = [2, 3, 0, 1]
@@ -39,11 +39,28 @@ class Track:  # {{{
 
 
 class State:
-    def __init__(self, x: int, y: int, out_dir: int, score: int = 0):
-        self.out_dir = out_dir
-        self.score = score
-        self.x = x
-        self.y = y
+    def __init__(
+        self,
+        x: int = None,
+        y: int = None,
+        out_dir: int = None,
+        score: int = 0,
+        prev: object = None,
+        last_track: object = None,
+    ):
+        self.last_track = last_track
+        self.prev = prev
+        if prev and last_track:
+            self.out_dir = last_track.out_dir
+            self.score = prev.x + last_track.dx
+            self.x = prev.x + last_track.dx
+            self.y = prev.y + last_track.dy
+            self.track_pos = []
+        else:
+            self.out_dir = out_dir
+            self.score = score
+            self.x = x
+            self.y = y
 
     def __lt__(self, other):
         return self.score < other.score
@@ -70,12 +87,7 @@ class TrackBot:
         for track in State.TRACKS:
             if track.in_dir != INVERSE_DIRS[state.out_dir]:
                 continue
-            new_state = State(
-                state.x + track.dx,
-                state.y + track.dy,
-                track.out_dir,
-                state.x + track.dx,
-            )
+            new_state = State(prev=state, last_track=track)
             if new_state.x < 0:
                 continue
             if not (0 <= new_state.y < self.map_height):
@@ -86,9 +98,7 @@ class TrackBot:
     def play(self):
         heap = []
 
-        # deal with the starting board
-        # parent_boards = { to_string(board): None}
-        # board_score = score(board)
+        # starting states
         for y in range(9):
             push(heap, State(-1, y, RIGHT))
         state = pop(heap)
@@ -96,11 +106,19 @@ class TrackBot:
         # move
         while state.score < GOAL:
             for child in self.expand(state):
-                print(child)
                 if self.seen(child):
                     continue
                 push(heap, child)
             state = heap.pop()
+
+        # trace
+        states = []
+        while state:
+            states.insert(0, state)
+            state = state.prev
+
+        for state in states:
+            print(state, state.last_track)
 
     def seen(self, track: object) -> bool:
         return False
