@@ -7,19 +7,27 @@ RIGHT = 1
 DOWN = 2
 LEFT = 3
 
-GOAL = 11
+GOAL = 21
 
 DIRS = ["UP", "RIGHT", "DOWN", "LEFT"]
+DX_DIRS = [0, 1, 0, -1]
+DY_DIRS = [-1, 0, 1, 0]
 INVERSE_DIRS = [2, 3, 0, 1]
 ROTATE_90_DIRS = [1, 2, 3, 0]
 
 
 class Track:  # {{{
-    def __init__(self, _id: int, in_dir: int, dx: int, dy: int, out_dir: int):
+    def __init__(self, _id: int, in_dir: int, steps: list[int], out_dir: int):
+        self.dx = DX_DIRS[INVERSE_DIRS[in_dir]]
+        self.dy = DY_DIRS[INVERSE_DIRS[in_dir]]
+        self.cells = [(self.dx, self.dy)]
+        for step in steps:
+            self.dx += DX_DIRS[step]
+            self.dy += DY_DIRS[step]
+            self.cells.append((self.dx, self.dy))
         self.id = _id
         self.in_dir = in_dir
-        self.dx = dx
-        self.dy = dy
+        self.steps = steps
         self.out_dir = out_dir
 
     def __str__(self):
@@ -29,13 +37,11 @@ class Track:  # {{{
         return Track(
             self.id,
             ROTATE_90_DIRS[self.in_dir],
-            -self.dy,
-            self.dx,
+            [ROTATE_90_DIRS[step] for step in self.steps],
             ROTATE_90_DIRS[self.out_dir],
         )
 
-
-# }}}
+    # }}}
 
 
 class State:
@@ -117,8 +123,18 @@ class TrackBot:
             states.insert(0, state)
             state = state.prev
 
-        for state in states:
-            print(state, state.last_track)
+        # draw
+        self.map = [["."] * self.map_width for _ in range(self.map_height)]
+        for state in states[1:]:
+            print(state.last_track)
+            for cell in state.last_track.cells:
+                x = state.prev.x + cell[0]
+                y = state.prev.y + cell[1]
+                self.map[y][x] = state.last_track.id
+        for y in range(self.map_height):
+            for x in range(self.map_width):
+                print(self.map[y][x], end="")
+            print()
 
     def seen(self, track: object) -> bool:
         return False
@@ -126,14 +142,14 @@ class TrackBot:
 
 bot = TrackBot(
     [
-        Track(1, LEFT, 1, 2, LEFT),
-        Track(1, LEFT, 1, -2, LEFT),
-        Track(2, LEFT, 1, 2, RIGHT),
-        Track(3, UP, 0, 3, DOWN),
-        Track(4, LEFT, 1, 2, DOWN),
-        Track(4, DOWN, 0, -3, LEFT),
-        Track(5, RIGHT, -1, 2, DOWN),
-        Track(5, DOWN, 0, -3, RIGHT),
+        Track(1, LEFT, [DOWN, DOWN], LEFT),
+        Track(1, LEFT, [UP, UP], LEFT),
+        Track(2, LEFT, [DOWN, DOWN], RIGHT),
+        Track(3, UP, [DOWN, DOWN], DOWN),
+        Track(4, LEFT, [DOWN, DOWN], DOWN),
+        Track(4, DOWN, [UP, UP], LEFT),
+        Track(5, RIGHT, [DOWN, DOWN], DOWN),
+        Track(5, DOWN, [UP, UP], RIGHT),
     ]
 )
 bot.play()
