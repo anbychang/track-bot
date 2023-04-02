@@ -1,4 +1,3 @@
-import copy
 from heapq import heappop as pop
 from heapq import heappush as push
 
@@ -131,7 +130,10 @@ class TrackBot:
                 self.map[y][x] = state.last_track.id
         for y in range(self.map_height):
             for x in range(self.map_width):
-                print(self.map[y][x], end="")
+                if self.map[y][x] == ".":
+                    print(".", end="")
+                else:
+                    print(f"\033[1;37;{int(self.map[y][x])+39}m{self.map[y][x]}\033[0m", end="")
             print()
 
     def seen(self, track: object) -> bool:
