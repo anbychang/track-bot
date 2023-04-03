@@ -108,10 +108,16 @@ class TrackBot:
 
     seen_states = {}
 
-    def __init__(self, track_ids: list[int], map_height: int = 9, map_width: int = 40):
+    def __init__(
+        self,
+        track_ids: list[int],
+        random_start: bool = False,
+        map_height: int = 9,
+        map_width: int = 40,
+    ):
         self.map_height = map_height
         self.map_width = map_width
-        self.random = random
+        self.random_start = random_start
         self.tracks = []
         for track in TRACKS:
             if track.id not in track_ids:
@@ -139,9 +145,11 @@ class TrackBot:
         heap = []
 
         # starting states
-        # for y in range(9):
-        #     push(heap, State(-1, y, RIGHT))
-        push(heap, State(-1, 4, RIGHT))
+        if self.random_start:
+            for y in range(9):
+                push(heap, State(-1, y, RIGHT))
+        else:
+            push(heap, State(-1, 4, RIGHT))
         state = pop(heap)
 
         # move
@@ -189,6 +197,7 @@ class TrackBot:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("tracks", nargs="+", type=int)
+    parser.add_argument("-rs", "--random-start", action="store_true")
     args = parser.parse_args()
-    bot = TrackBot(args.tracks)
+    bot = TrackBot(args.tracks, random_start=args.random_start)
     bot.play()
