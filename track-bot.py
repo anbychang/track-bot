@@ -17,7 +17,8 @@ INVERSE_DIRS = [2, 3, 0, 1]
 ROTATE_90_DIRS = [1, 2, 3, 0]
 
 
-class Track:  # {{{
+class Track:
+    # {{{
     def __init__(self, _id: int, in_dir: int, steps: list[int], out_dir: int):
         self.dx = DX_DIRS[INVERSE_DIRS[in_dir]]
         self.dy = DY_DIRS[INVERSE_DIRS[in_dir]]
@@ -34,6 +35,9 @@ class Track:  # {{{
     def __str__(self):
         return f"{self.id} {DIRS[self.in_dir]} {self.dx} {self.dy} {DIRS[self.out_dir]}"
 
+    def can_connect(prev_out_dir: int, next_in_dir: int) -> bool:
+        return prev_out_dir == INVERSE_DIRS[next_in_dir]
+
     def rotate_90(self) -> object:
         return Track(
             self.id,
@@ -43,25 +47,6 @@ class Track:  # {{{
         )
 
     # }}}
-
-
-TRACKS = [
-    Track(1, LEFT, [DOWN, DOWN], LEFT),
-    Track(1, LEFT, [UP, UP], LEFT),
-    Track(2, LEFT, [DOWN, DOWN], RIGHT),
-    Track(3, UP, [DOWN, DOWN], DOWN),
-    Track(4, LEFT, [DOWN, DOWN], DOWN),
-    Track(4, DOWN, [UP, UP], LEFT),
-    Track(5, RIGHT, [DOWN, DOWN], DOWN),
-    Track(5, DOWN, [UP, UP], RIGHT),
-    Track(6, UP, [DOWN], DOWN),
-    Track(7, RIGHT, [DOWN], DOWN),
-    Track(7, DOWN, [UP], RIGHT),
-    Track(8, LEFT, [DOWN], DOWN),
-    Track(8, DOWN, [UP], LEFT),
-    Track(9, LEFT, [DOWN], LEFT),
-    Track(9, LEFT, [UP], LEFT),
-]
 
 
 class State:
@@ -107,64 +92,83 @@ class State:
 class TrackBot:
 
     seen_states = {}
+    ALL_TRACKS = [
+        # {{{
+        Track(1, LEFT, [DOWN, DOWN], LEFT),
+        Track(1, LEFT, [UP, UP], LEFT),
+        Track(2, LEFT, [DOWN, DOWN], RIGHT),
+        Track(3, UP, [DOWN, DOWN], DOWN),
+        Track(4, LEFT, [DOWN, DOWN], DOWN),
+        Track(4, DOWN, [UP, UP], LEFT),
+        Track(5, RIGHT, [DOWN, DOWN], DOWN),
+        Track(5, DOWN, [UP, UP], RIGHT),
+        Track(6, UP, [DOWN], DOWN),
+        Track(7, RIGHT, [DOWN], DOWN),
+        Track(7, DOWN, [UP], RIGHT),
+        Track(8, LEFT, [DOWN], DOWN),
+        Track(8, DOWN, [UP], LEFT),
+        Track(9, LEFT, [DOWN], LEFT),
+        Track(9, LEFT, [UP], LEFT),
+        # }}}
+    ]
 
-    def __init__(
-        self,
-        track_ids: list[int],
-        random_start: bool = False,
-        map_height: int = 9,
-        map_width: int = 40,
-    ):
-        self.map_height = map_height
-        self.map_width = map_width
-        self.random_start = random_start
-        self.tracks = []
-        for track in TRACKS:
-            if track.id not in track_ids:
+    def __init__(self, args: object):
+        self.args = args
+        self.init_game_tracks()
+        self.init_states(args.random_start)
+
+    def init_game_tracks(self):
+        # {{{
+        self.game_tracks = []
+        for track in TrackBot.ALL_TRACKS:
+            if track.id not in self.args.game_tracks:
                 continue
-            self.tracks.append(track)
-            for i in range(3):
-                self.tracks.append(self.tracks[-1].rotate_90())
+            self.game_tracks.append(track)
+            for i in range(3):  # rotate the track 90 degrees 3 times
+                self.game_tracks.append(self.game_tracks[-1].rotate_90())
+        # }}}
+
+    def init_states(self, random: bool = True):
+        # {{{
+        self.state_heap = []
+        if random:
+            for y in range(9):
+                push(self.state_heap, State(-1, y, RIGHT))
+        else:
+            push(self.state_heap, State(-1, 4, RIGHT))
+        # }}}
 
     def expand(self, state) -> list:
         states = []
-        for track in self.tracks:
-            if track.in_dir != INVERSE_DIRS[state.out_dir]:
+        for track in self.game_tracks:
+            if not Track.can_connect(state.out_dir, track.in_dir):
                 continue
             if track.id in state.used_track_ids:
                 continue
             new_state = State(prev=state, last_track=track)
             if new_state.x < 0:
                 continue
-            if not (0 <= new_state.y < self.map_height):
+            if not (0 <= new_state.y < self.args.map_height):
                 continue
             states.append(new_state)
         return states
 
     def play(self):
-        heap = []
-
-        # starting states
-        if self.random_start:
-            for y in range(9):
-                push(heap, State(-1, y, RIGHT))
-        else:
-            push(heap, State(-1, 4, RIGHT))
-        state = pop(heap)
 
         # move
-        i = 0
+        i_state = 0
+        state = pop(self.state_heap)
         while state.x < GOAL:
-            i += 1
-            # if i == 2:
-            #     print(state)
+            i_state += 1
+            if i_state == self.args.print_state:
+                print(state)
             for child in self.expand(state):
                 if self.seen(child):
                     continue
-                # if i == 2:
-                #     print(child.last_track.id, child)
-                push(heap, child)
-            state = pop(heap)
+                if i_state == self.args.print_state:
+                    print(child.last_track.id, child)
+                push(self.state_heap, child)
+            state = pop(self.state_heap)
 
         # back-trace
         print(state.n_steps, state.score)
@@ -174,14 +178,14 @@ class TrackBot:
             state = state.prev
 
         # draw
-        self.map = [["."] * self.map_width for _ in range(self.map_height)]
+        self.map = [["."] * self.args.map_width for _ in range(self.args.map_height)]
         for state in states[1:]:
             for cell in state.last_track.cells:
                 x = state.prev.x + cell[0]
                 y = state.prev.y + cell[1]
                 self.map[y][x] = state.last_track.id
-        for y in range(self.map_height):
-            for x in range(self.map_width):
+        for y in range(self.args.map_height):
+            for x in range(self.args.map_width):
                 if self.map[y][x] == ".":
                     print(".", end="")
                 else:
@@ -196,8 +200,11 @@ class TrackBot:
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("tracks", nargs="+", type=int)
+    parser.add_argument("game_tracks", nargs="+", type=int)
+    parser.add_argument("-mh", "--map-height", default=9, type=int)
+    parser.add_argument("-mw", "--map-width", default=40, type=int)
+    parser.add_argument("-ps", "--print-state", type=int)
     parser.add_argument("-rs", "--random-start", action="store_true")
     args = parser.parse_args()
-    bot = TrackBot(args.tracks, random_start=args.random_start)
+    bot = TrackBot(args)
     bot.play()
