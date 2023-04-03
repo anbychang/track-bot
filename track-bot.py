@@ -112,6 +112,23 @@ class TrackBot:
         self.init_game_tracks()
         self.init_states(args.random_start)
 
+    def draw(self, history: list):
+        # {{{
+        canvas = [["."] * self.args.map_width for _ in range(self.args.map_height)]
+        for state in history[1:]:
+            for dx, dy in state.last_track.cells:
+                x = state.prev.x + dx
+                y = state.prev.y + dy
+                canvas[y][x] = state.last_track.id
+        for y in range(self.args.map_height):
+            for x in range(self.args.map_width):
+                if canvas[y][x] == ".":
+                    print(".", end="")
+                else:
+                    print(f"\033[1;37;{canvas[y][x]+39}m{canvas[y][x]}\033[0m", end="")
+            print()
+        # }}}
+
     def init_game_tracks(self):
         # {{{
         self.game_tracks = []
@@ -151,7 +168,6 @@ class TrackBot:
         # }}}
 
     def play(self):
-
         # move
         i_state = 0
         state = pop(self.state_heap)
@@ -166,30 +182,15 @@ class TrackBot:
                     print(child.last_track.id, child)
                 push(self.state_heap, child)
             state = pop(self.state_heap)
+        print(f"#steps: {state.n_steps}, score: {state.score:.2f}")
 
         # back-trace
-        print(state.n_steps, state.score)
-        states = []
+        history = []
         while state:
-            states.insert(0, state)
+            history.insert(0, state)
             state = state.prev
 
-        # draw
-        self.map = [["."] * self.args.map_width for _ in range(self.args.map_height)]
-        for state in states[1:]:
-            for cell in state.last_track.cells:
-                x = state.prev.x + cell[0]
-                y = state.prev.y + cell[1]
-                self.map[y][x] = state.last_track.id
-        for y in range(self.args.map_height):
-            for x in range(self.args.map_width):
-                if self.map[y][x] == ".":
-                    print(".", end="")
-                else:
-                    print(
-                        f"\033[1;37;{self.map[y][x]+39}m{self.map[y][x]}\033[0m", end=""
-                    )
-            print()
+        self.draw(history)
 
     def seen(self, track: object) -> bool:
         return False
