@@ -8,7 +8,7 @@ RIGHT = 1
 DOWN = 2
 LEFT = 3
 
-GOAL = 25
+GOAL = 36
 
 DIRS = ["UP", "RIGHT", "DOWN", "LEFT"]
 DX_DIRS = [0, 1, 0, -1]
@@ -54,6 +54,13 @@ TRACKS = [
     Track(4, DOWN, [UP, UP], LEFT),
     Track(5, RIGHT, [DOWN, DOWN], DOWN),
     Track(5, DOWN, [UP, UP], RIGHT),
+    Track(6, UP, [DOWN], DOWN),
+    Track(7, RIGHT, [DOWN], DOWN),
+    Track(7, DOWN, [UP], RIGHT),
+    Track(8, LEFT, [DOWN], DOWN),
+    Track(8, DOWN, [UP], LEFT),
+    Track(9, LEFT, [DOWN], LEFT),
+    Track(9, LEFT, [UP], LEFT),
 ]
 
 
@@ -66,17 +73,25 @@ class State:
         score: int = -1,
         prev: object = None,
         last_track: object = None,
+        n_steps: int = 0,
     ):
         self.last_track = last_track
         self.prev = prev
         if prev and last_track:
+            self.n_steps = self.prev.n_steps + 1
             self.out_dir = last_track.out_dir
-            self.score = prev.x + last_track.dx
+            self.score = (prev.x + last_track.dx) / self.n_steps
             self.x = prev.x + last_track.dx
             self.y = prev.y + last_track.dy
+            self.used_track_ids = self.prev.used_track_ids[:]
+            self.used_track_ids.append(last_track.id)
+            if len(self.used_track_ids) > 3:
+                self.used_track_ids.pop(0)
         else:
+            self.n_steps = n_steps
             self.out_dir = out_dir
             self.score = score
+            self.used_track_ids = []
             self.x = x
             self.y = y
 
@@ -86,14 +101,14 @@ class State:
         return self.score > other.score  # since heapq always pops the smallest element
 
     def __str__(self):
-        return f"{self.x} {self.y} {DIRS[self.out_dir]} {self.score}"
+        return f"({self.x}, {self.y}) {DIRS[self.out_dir]} score: {self.score}, #steps: {self.n_steps}"
 
 
 class TrackBot:
 
     seen_states = {}
 
-    def __init__(self, track_ids: list[int], map_height: int = 9, map_width: int = 36):
+    def __init__(self, track_ids: list[int], map_height: int = 9, map_width: int = 40):
         self.map_height = map_height
         self.map_width = map_width
         self.random = random
@@ -109,6 +124,8 @@ class TrackBot:
         states = []
         for track in self.tracks:
             if track.in_dir != INVERSE_DIRS[state.out_dir]:
+                continue
+            if track.id in state.used_track_ids:
                 continue
             new_state = State(prev=state, last_track=track)
             if new_state.x < 0:
@@ -128,14 +145,21 @@ class TrackBot:
         state = pop(heap)
 
         # move
-        while state.score < GOAL:
+        i = 0
+        while state.x < GOAL:
+            i += 1
+            # if i == 2:
+            #     print(state)
             for child in self.expand(state):
                 if self.seen(child):
                     continue
+                # if i == 2:
+                #     print(child.last_track.id, child)
                 push(heap, child)
             state = pop(heap)
 
         # back-trace
+        print(state.n_steps, state.score)
         states = []
         while state:
             states.insert(0, state)
