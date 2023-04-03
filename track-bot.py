@@ -1,12 +1,14 @@
+import argparse
 from heapq import heappop as pop
 from heapq import heappush as push
+from random import random
 
 UP = 0
 RIGHT = 1
 DOWN = 2
 LEFT = 3
 
-GOAL = 20
+GOAL = 25
 
 DIRS = ["UP", "RIGHT", "DOWN", "LEFT"]
 DX_DIRS = [0, 1, 0, -1]
@@ -43,6 +45,18 @@ class Track:  # {{{
     # }}}
 
 
+TRACKS = [
+    Track(1, LEFT, [DOWN, DOWN], LEFT),
+    Track(1, LEFT, [UP, UP], LEFT),
+    Track(2, LEFT, [DOWN, DOWN], RIGHT),
+    Track(3, UP, [DOWN, DOWN], DOWN),
+    Track(4, LEFT, [DOWN, DOWN], DOWN),
+    Track(4, DOWN, [UP, UP], LEFT),
+    Track(5, RIGHT, [DOWN, DOWN], DOWN),
+    Track(5, DOWN, [UP, UP], RIGHT),
+]
+
+
 class State:
     def __init__(
         self,
@@ -67,6 +81,8 @@ class State:
             self.y = y
 
     def __lt__(self, other):
+        if self.score == other.score:
+            return random() < 0.5
         return self.score > other.score  # since heapq always pops the smallest element
 
     def __str__(self):
@@ -77,18 +93,21 @@ class TrackBot:
 
     seen_states = {}
 
-    def __init__(self, tracks: list, map_height: int = 9, map_width: int = 36):
+    def __init__(self, track_ids: list[int], map_height: int = 9, map_width: int = 36):
         self.map_height = map_height
         self.map_width = map_width
-        State.TRACKS = []
-        for track in tracks:
-            State.TRACKS.append(track)
+        self.random = random
+        self.tracks = []
+        for track in TRACKS:
+            if track.id not in track_ids:
+                continue
+            self.tracks.append(track)
             for i in range(3):
-                State.TRACKS.append(State.TRACKS[-1].rotate_90())
+                self.tracks.append(self.tracks[-1].rotate_90())
 
     def expand(self, state) -> list:
         states = []
-        for track in State.TRACKS:
+        for track in self.tracks:
             if track.in_dir != INVERSE_DIRS[state.out_dir]:
                 continue
             new_state = State(prev=state, last_track=track)
@@ -103,8 +122,9 @@ class TrackBot:
         heap = []
 
         # starting states
-        for y in range(9):
-            push(heap, State(-1, y, RIGHT))
+        # for y in range(9):
+        #     push(heap, State(-1, y, RIGHT))
+        push(heap, State(-1, 4, RIGHT))
         state = pop(heap)
 
         # move
@@ -133,23 +153,18 @@ class TrackBot:
                 if self.map[y][x] == ".":
                     print(".", end="")
                 else:
-                    print(f"\033[1;37;{int(self.map[y][x])+39}m{self.map[y][x]}\033[0m", end="")
+                    print(
+                        f"\033[1;37;{self.map[y][x]+39}m{self.map[y][x]}\033[0m", end=""
+                    )
             print()
 
     def seen(self, track: object) -> bool:
         return False
 
 
-bot = TrackBot(
-    [
-        # Track(1, LEFT, [DOWN, DOWN], LEFT),
-        # Track(1, LEFT, [UP, UP], LEFT),
-        Track(2, LEFT, [DOWN, DOWN], RIGHT),
-        # Track(3, UP, [DOWN, DOWN], DOWN),
-        Track(4, LEFT, [DOWN, DOWN], DOWN),
-        Track(4, DOWN, [UP, UP], LEFT),
-        Track(5, RIGHT, [DOWN, DOWN], DOWN),
-        Track(5, DOWN, [UP, UP], RIGHT),
-    ]
-)
-bot.play()
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("tracks", nargs="+", type=int)
+    args = parser.parse_args()
+    bot = TrackBot(args.tracks)
+    bot.play()
