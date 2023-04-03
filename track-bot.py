@@ -68,7 +68,6 @@ class State:
         self.out_dir = track.out_dir
         self.x += track.dx
         self.y += track.dy
-        self.score = self.x / self.n_steps
         self.used_track_ids.append(track.id)
         if len(self.used_track_ids) > 3:
             self.used_track_ids.pop(0)
@@ -153,13 +152,19 @@ class TrackBot:
     def expand(self, state) -> list:
         # {{{
         for track in self.game_tracks:
+            # validate track
             if not Track.is_addable(state.out_dir, track.in_dir):
                 continue
             if track.id in state.used_track_ids:
                 continue
+
+            # make the new state
             new_state = deepcopy(state)
             new_state.prev = state
             new_state.add(track)
+            new_state.score = self.score(new_state)
+
+            # validate the new state
             if new_state.x < 0:
                 continue
             if not (0 <= new_state.y < self.args.map_height):
@@ -191,6 +196,10 @@ class TrackBot:
             state = state.prev
 
         self.draw(history)
+
+    #! make this function better
+    def score(self, state: object) -> float:
+        return state.x / state.n_steps
 
     def seen(self, track: object) -> bool:
         return False
