@@ -1,4 +1,5 @@
 import argparse
+from copy import deepcopy
 from heapq import heappop as pop
 from heapq import heappush as push
 from random import random
@@ -35,7 +36,7 @@ class Track:
     def __str__(self):
         return f"{self.id} {DIRS[self.in_dir]} {self.dx} {self.dy} {DIRS[self.out_dir]}"
 
-    def can_connect(prev_out_dir: int, next_in_dir: int) -> bool:
+    def is_addable(prev_out_dir: int, next_in_dir: int) -> bool:
         return prev_out_dir == INVERSE_DIRS[next_in_dir]
 
     def rotate_90(self) -> object:
@@ -50,35 +51,27 @@ class Track:
 
 
 class State:
-    def __init__(
-        self,
-        x: int = None,
-        y: int = None,
-        out_dir: int = None,
-        score: int = -1,
-        prev: object = None,
-        last_track: object = None,
-        n_steps: int = 0,
-    ):
-        self.last_track = last_track
-        self.prev = prev
-        if prev and last_track:
-            self.n_steps = self.prev.n_steps + 1
-            self.out_dir = last_track.out_dir
-            self.score = (prev.x + last_track.dx) / self.n_steps
-            self.x = prev.x + last_track.dx
-            self.y = prev.y + last_track.dy
-            self.used_track_ids = self.prev.used_track_ids[:]
-            self.used_track_ids.append(last_track.id)
-            if len(self.used_track_ids) > 3:
-                self.used_track_ids.pop(0)
-        else:
-            self.n_steps = n_steps
-            self.out_dir = out_dir
-            self.score = score
-            self.used_track_ids = []
-            self.x = x
-            self.y = y
+    # {{{
+    def __init__(self, y: int):
+        self.last_track = None
+        self.n_steps = 0
+        self.out_dir = RIGHT
+        self.prev = None
+        self.score = -1
+        self.used_track_ids = []
+        self.x = -1
+        self.y = y
+
+    def add(self, track: object):
+        self.last_track = track
+        self.n_steps += 1
+        self.out_dir = track.out_dir
+        self.x += track.dx
+        self.y += track.dy
+        self.score = self.x / self.n_steps
+        self.used_track_ids.append(track.id)
+        if len(self.used_track_ids) > 3:
+            self.used_track_ids.pop(0)
 
     def __lt__(self, other):
         if self.score == other.score:
@@ -87,6 +80,8 @@ class State:
 
     def __str__(self):
         return f"({self.x}, {self.y}) {DIRS[self.out_dir]} score: {self.score}, #steps: {self.n_steps}"
+
+    # }}}
 
 
 class TrackBot:
@@ -133,25 +128,27 @@ class TrackBot:
         self.state_heap = []
         if random:
             for y in range(9):
-                push(self.state_heap, State(-1, y, RIGHT))
+                push(self.state_heap, State(y))
         else:
-            push(self.state_heap, State(-1, 4, RIGHT))
+            push(self.state_heap, State(4))
         # }}}
 
     def expand(self, state) -> list:
-        states = []
+        # {{{
         for track in self.game_tracks:
-            if not Track.can_connect(state.out_dir, track.in_dir):
+            if not Track.is_addable(state.out_dir, track.in_dir):
                 continue
             if track.id in state.used_track_ids:
                 continue
-            new_state = State(prev=state, last_track=track)
+            new_state = deepcopy(state)
+            new_state.prev = state
+            new_state.add(track)
             if new_state.x < 0:
                 continue
             if not (0 <= new_state.y < self.args.map_height):
                 continue
-            states.append(new_state)
-        return states
+            yield new_state
+        # }}}
 
     def play(self):
 
