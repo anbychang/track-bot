@@ -124,46 +124,32 @@ class TrackBot:
 
     def draw(self, history: list):
         # {{{
+        HIGHLIGHT_NUMBERS = ["⓪ ", "① ", "② ", "③ ", "④ ", "⑤ ", "⑥ ", "⑦ ", "⑧ ", "⑨ "]
+        NUMBERS = "０１２３４５６７８９"
         canvas = [["."] * self.args.map_width for _ in range(self.args.map_height)]
         for state in history[1:]:
             for x, y in state.last_track_xys():
                 canvas[y][x] = state.last_track.id
         for x in range(self.args.map_width):
-            print(f"{(x+1) % 10:<2d}", end="")
+            print(f"{NUMBERS[(x+1) % 10]}", end="")
         print()
         for y in range(self.args.map_height):
             for x in range(self.args.map_width):
                 if canvas[y][x] == ".":
-                    if x in [8, 17, 26]:
-                        print("| ", end="")
+                    if x in TrackBot.SUPPLY_XS:
+                        char = "｜"
                     elif x < 36:
-                        print(". ", end="")
+                        char = "．"
                     else:
-                        print("  ", end="")
+                        char = "　"
                 else:
-                    print(f"\033[1;37;{canvas[y][x]+39}m{canvas[y][x]} \033[0m", end="")
+                    if self.is_supply(x, y) is None:
+                        char = NUMBERS[canvas[y][x]]
+                    else:
+                        char = HIGHLIGHT_NUMBERS[canvas[y][x]]
+                    char = f"\033[1;37;{canvas[y][x]+39}m{char}\033[0m"
+                print(char, end="")
             print()
-        # }}}
-
-    def init_game_tracks(self):
-        # {{{
-        self.game_tracks = []
-        for track in TrackBot.ALL_TRACKS:
-            if track.id not in self.args.game_tracks:
-                continue
-            self.game_tracks.append(track)
-            for i in range(3):  # rotate the track 90 degrees 3 times
-                self.game_tracks.append(self.game_tracks[-1].rotate_90())
-        # }}}
-
-    def init_states(self, random: bool = True):
-        # {{{
-        self.state_heap = []
-        if random:
-            for y in range(9):
-                push(self.state_heap, State(y))
-        else:
-            push(self.state_heap, State(4))
         # }}}
 
     def expand(self, state) -> list:
@@ -199,6 +185,33 @@ class TrackBot:
             yield new_state
         # }}}
 
+    def init_game_tracks(self):
+        # {{{
+        self.game_tracks = []
+        for track in TrackBot.ALL_TRACKS:
+            if track.id not in self.args.game_tracks:
+                continue
+            self.game_tracks.append(track)
+            for i in range(3):  # rotate the track 90 degrees 3 times
+                self.game_tracks.append(self.game_tracks[-1].rotate_90())
+        # }}}
+
+    def init_states(self, random: bool = True):
+        # {{{
+        self.state_heap = []
+        if random:
+            for y in range(9):
+                push(self.state_heap, State(y))
+        else:
+            push(self.state_heap, State(4))
+        # }}}
+
+    def is_supply(self, x: int, y: int) -> int:
+        for i in range(len(TrackBot.SUPPLY_XS)):
+            sx, sy = TrackBot.SUPPLY_XS[i], self.args.supplies[i]
+            if x == sx and y == sy:
+                return i
+
     def play(self):
         # move
         i_state = 0
@@ -228,10 +241,9 @@ class TrackBot:
         # {{{
         if self.args.supplies:
             for x, y in state.last_track_xys():
-                for i in range(len(TrackBot.SUPPLY_XS)):
-                    sx, sy = TrackBot.SUPPLY_XS[i], self.args.supplies[i]
-                    if x == sx and y == sy:
-                        state.passed_supplies[i] = 1
+                i = self.is_supply(x, y)
+                if i is not None:
+                    state.passed_supplies[i] = 1
             n_passed_supplies = sum(state.passed_supplies)
             for i in range(len(TrackBot.SUPPLY_XS)):
                 if state.x > TrackBot.SUPPLY_XS[i] and n_passed_supplies < i + 1:
