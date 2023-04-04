@@ -85,9 +85,14 @@ class State:
 
 class TrackBot:
 
-    seen_states = {}
+    # {{{
     ALL_TRACKS = [
-        # {{{
+        Track(0, LEFT, [UP], RIGHT),  # 0 means S
+        Track(0, LEFT, [DOWN], RIGHT),
+        Track(0, RIGHT, [DOWN], LEFT),
+        Track(0, RIGHT, [DOWN, DOWN], RIGHT),
+        Track(0, RIGHT, [UP], LEFT),
+        Track(0, RIGHT, [UP, UP], RIGHT),
         Track(1, LEFT, [DOWN, DOWN], LEFT),
         Track(1, LEFT, [UP, UP], LEFT),
         Track(2, LEFT, [DOWN, DOWN], RIGHT),
@@ -103,8 +108,9 @@ class TrackBot:
         Track(8, DOWN, [UP], LEFT),
         Track(9, LEFT, [DOWN], LEFT),
         Track(9, LEFT, [UP], LEFT),
-        # }}}
     ]
+    # }}}
+    seen_states = {}
 
     def __init__(self, args: object):
         self.args = args
