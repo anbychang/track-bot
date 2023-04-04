@@ -54,6 +54,7 @@ class State:
     # {{{
     def __init__(self, y: int):
         self.last_track = None
+        self.n_cells = 0
         self.n_steps = 0
         self.out_dir = RIGHT
         self.passed_supplies = [0] * 3
@@ -63,14 +64,6 @@ class State:
         self.x = -1
         self.y = y
 
-    def add(self, track: object):
-        self.last_track = track
-        self.n_steps += 1
-        self.out_dir = track.out_dir
-        self.x += track.dx
-        self.y += track.dy
-        self.used_track_ids.append(track.id)
-
     def __lt__(self, other):
         if self.score == other.score:
             return random() < 0.5
@@ -78,6 +71,19 @@ class State:
 
     def __str__(self):
         return f"({self.x}, {self.y}) {DIRS[self.out_dir]} score: {self.score}, #steps: {self.n_steps}"
+
+    def add(self, track: object):
+        self.last_track = track
+        self.n_cells += len(track.steps) + 1
+        self.n_steps += 1
+        self.out_dir = track.out_dir
+        self.x += track.dx
+        self.y += track.dy
+        self.used_track_ids.append(track.id)
+
+    def last_track_xys(self) -> list:
+        for dx, dy in self.last_track.cells:
+            yield self.prev.x + dx, self.prev.y + dy
 
     # }}}
 
@@ -109,7 +115,7 @@ class TrackBot:
         Track(9, LEFT, [UP], LEFT),
     ]
     # }}}
-    seen_states = {}
+    SUPPLY_XS = [8, 17, 26]
 
     def __init__(self, args: object):
         self.args = args
@@ -120,9 +126,7 @@ class TrackBot:
         # {{{
         canvas = [["."] * self.args.map_width for _ in range(self.args.map_height)]
         for state in history[1:]:
-            for dx, dy in state.last_track.cells:
-                x = state.prev.x + dx
-                y = state.prev.y + dy
+            for x, y in state.last_track_xys():
                 canvas[y][x] = state.last_track.id
         for x in range(self.args.map_width):
             print(f"{(x+1) % 10:<2d}", end="")
@@ -175,8 +179,16 @@ class TrackBot:
             new_state = deepcopy(state)
             new_state.prev = state
             new_state.add(track)
-            if len(new_state.used_track_ids) > 3:
-                new_state.used_track_ids.pop(0)
+            if self.args.supplies:  # 排名賽
+                # clear the `used_track_ids` every 5 tracks
+                if new_state.n_steps % 5 == 0:
+                    new_state.used_track_ids = new_state.used_track_ids[4:]
+                if new_state.n_steps % 5 == 1:
+                    new_state.used_track_ids = [new_state.used_track_ids[-1]]
+            else:  # 對抗賽
+                # maintain the 3 tracks (before, on and after the bot) in `used_track_ids`
+                if len(new_state.used_track_ids) > 3:
+                    new_state.used_track_ids.pop(0)
             new_state.score = self.score(new_state)
 
             # validate the new state
@@ -191,18 +203,18 @@ class TrackBot:
         # move
         i_state = 0
         state = pop(self.state_heap)
-        while state.x < GOAL:
+        while state.x + 1 < GOAL:
             i_state += 1
             if i_state == self.args.print_state:
                 print(state)
             for child in self.expand(state):
-                if self.seen(child):
-                    continue
                 if i_state == self.args.print_state:
                     print(child.last_track.id, child)
                 push(self.state_heap, child)
             state = pop(self.state_heap)
-        print(f"#steps: {state.n_steps}, score: {state.score:.2f}")
+        print(
+            f"{state.n_steps} tracks, {state.n_cells} cells, score: {state.score:.2f}"
+        )
 
         # back-trace
         history = []
@@ -212,30 +224,20 @@ class TrackBot:
 
         self.draw(history)
 
-    #! make this function better
     def score(self, state: object) -> float:
-        for dx, dy in state.last_track.cells:
-            x = state.prev.x + dx
-            y = state.prev.y + dy
-            if x == 8 and y == self.args.supplies[0]:
-                state.passed_supplies[0] = 1
-            if x == 17 and y == self.args.supplies[1]:
-                state.passed_supplies[1] = 1
-            if x == 26 and y == self.args.supplies[2]:
-                state.passed_supplies[2] = 1
-        n_passed_supplies = sum(state.passed_supplies)
-        if state.x > 8 and n_passed_supplies < 1:
-            return 0
-        if state.x > 17 and n_passed_supplies < 2:
-            return 0
-        if state.x > 26 and n_passed_supplies < 3:
-            return 0
-        score = state.x / state.n_steps
-        # score += [0, 3, 13, 33][sum(state.passed_supplies)]
-        return score
-
-    def seen(self, track: object) -> bool:
-        return False
+        # {{{
+        if self.args.supplies:
+            for x, y in state.last_track_xys():
+                for i in range(len(TrackBot.SUPPLY_XS)):
+                    sx, sy = TrackBot.SUPPLY_XS[i], self.args.supplies[i]
+                    if x == sx and y == sy:
+                        state.passed_supplies[i] = 1
+            n_passed_supplies = sum(state.passed_supplies)
+            for i in range(len(TrackBot.SUPPLY_XS)):
+                if state.x > TrackBot.SUPPLY_XS[i] and n_passed_supplies < i + 1:
+                    return -1
+        return min(state.x + 1, 36) / state.n_steps
+        # }}}
 
 
 if __name__ == "__main__":
@@ -245,7 +247,7 @@ if __name__ == "__main__":
     parser.add_argument("-mw", "--map-width", default=40, type=int)
     parser.add_argument("-ps", "--print-state", type=int)
     parser.add_argument("-rs", "--random-start", action="store_true")
-    parser.add_argument("-s", "--supplies", nargs=3, type=int)
+    parser.add_argument("-s", "--supplies", nargs=len(TrackBot.SUPPLY_XS), type=int)
     args = parser.parse_args()
     bot = TrackBot(args)
     bot.play()
