@@ -56,6 +56,7 @@ class State:
         self.last_track = None
         self.n_steps = 0
         self.out_dir = RIGHT
+        self.passed_supplies = [0] * 3
         self.prev = None
         self.score = -1
         self.used_track_ids = []
@@ -69,8 +70,6 @@ class State:
         self.x += track.dx
         self.y += track.dy
         self.used_track_ids.append(track.id)
-        if len(self.used_track_ids) > 3:
-            self.used_track_ids.pop(0)
 
     def __lt__(self, other):
         if self.score == other.score:
@@ -125,12 +124,20 @@ class TrackBot:
                 x = state.prev.x + dx
                 y = state.prev.y + dy
                 canvas[y][x] = state.last_track.id
+        for x in range(self.args.map_width):
+            print(f"{(x+1) % 10:<2d}", end="")
+        print()
         for y in range(self.args.map_height):
             for x in range(self.args.map_width):
                 if canvas[y][x] == ".":
-                    print(".", end="")
+                    if x in [8, 17, 26]:
+                        print("| ", end="")
+                    elif x < 36:
+                        print(". ", end="")
+                    else:
+                        print("  ", end="")
                 else:
-                    print(f"\033[1;37;{canvas[y][x]+39}m{canvas[y][x]}\033[0m", end="")
+                    print(f"\033[1;37;{canvas[y][x]+39}m{canvas[y][x]} \033[0m", end="")
             print()
         # }}}
 
@@ -168,6 +175,8 @@ class TrackBot:
             new_state = deepcopy(state)
             new_state.prev = state
             new_state.add(track)
+            if len(new_state.used_track_ids) > 3:
+                new_state.used_track_ids.pop(0)
             new_state.score = self.score(new_state)
 
             # validate the new state
@@ -205,7 +214,25 @@ class TrackBot:
 
     #! make this function better
     def score(self, state: object) -> float:
-        return state.x / state.n_steps
+        for dx, dy in state.last_track.cells:
+            x = state.prev.x + dx
+            y = state.prev.y + dy
+            if x == 8 and y == self.args.supplies[0]:
+                state.passed_supplies[0] = 1
+            if x == 17 and y == self.args.supplies[1]:
+                state.passed_supplies[1] = 1
+            if x == 26 and y == self.args.supplies[2]:
+                state.passed_supplies[2] = 1
+        n_passed_supplies = sum(state.passed_supplies)
+        if state.x > 8 and n_passed_supplies < 1:
+            return 0
+        if state.x > 17 and n_passed_supplies < 2:
+            return 0
+        if state.x > 26 and n_passed_supplies < 3:
+            return 0
+        score = state.x / state.n_steps
+        # score += [0, 3, 13, 33][sum(state.passed_supplies)]
+        return score
 
     def seen(self, track: object) -> bool:
         return False
@@ -218,6 +245,7 @@ if __name__ == "__main__":
     parser.add_argument("-mw", "--map-width", default=40, type=int)
     parser.add_argument("-ps", "--print-state", type=int)
     parser.add_argument("-rs", "--random-start", action="store_true")
+    parser.add_argument("-s", "--supplies", nargs=3, type=int)
     args = parser.parse_args()
     bot = TrackBot(args)
     bot.play()
