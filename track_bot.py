@@ -207,6 +207,8 @@ class TrackBot:
         # }}}
 
     def is_supply(self, x: int, y: int) -> int:
+        if self.args.supplies is None:
+            return
         for i in range(len(TrackBot.SUPPLY_XS)):
             sx, sy = TrackBot.SUPPLY_XS[i], self.args.supplies[i]
             if x == sx and y == sy:
