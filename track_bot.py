@@ -117,17 +117,24 @@ class TrackBot:
     # }}}
     SUPPLY_XS = [8, 17, 26]
 
-    def __init__(self, args: object):
+    def __init__(self, args: object, play: bool = False):
         self.args = args
         self.init_game_tracks()
         self.init_states(args.random_start)
+        if play:
+            self.play()
 
-    def draw(self, history: list):
+    def draw(self):
         # {{{
+        state = self.history[-1]
+        print(
+            f"{state.n_steps} tracks, {state.n_cells} cells, score: {state.score:.2f}"
+        )
+
         HIGHLIGHT_NUMBERS = ["⓪ ", "① ", "② ", "③ ", "④ ", "⑤ ", "⑥ ", "⑦ ", "⑧ ", "⑨ "]
         NUMBERS = "０１２３４５６７８９"
         canvas = [["."] * self.args.map_width for _ in range(self.args.map_height)]
-        for state in history[1:]:
+        for state in self.history[1:]:
             for x, y in state.last_track_xys():
                 canvas[y][x] = state.last_track.id
         for x in range(self.args.map_width):
@@ -218,7 +225,7 @@ class TrackBot:
         # move
         i_state = 0
         state = pop(self.state_heap)
-        while state.x + 1 < GOAL:
+        while state.x < GOAL:
             i_state += 1
             if i_state == self.args.print_state:
                 print(state)
@@ -227,17 +234,12 @@ class TrackBot:
                     print(child.last_track.id, child)
                 push(self.state_heap, child)
             state = pop(self.state_heap)
-        print(
-            f"{state.n_steps} tracks, {state.n_cells} cells, score: {state.score:.2f}"
-        )
 
         # back-trace
-        history = []
+        self.history = []
         while state:
-            history.insert(0, state)
+            self.history.insert(0, state)
             state = state.prev
-
-        self.draw(history)
 
     def score(self, state: object) -> float:
         # {{{
@@ -250,7 +252,7 @@ class TrackBot:
             for i in range(len(TrackBot.SUPPLY_XS)):
                 if state.x > TrackBot.SUPPLY_XS[i] and n_passed_supplies < i + 1:
                     return -1
-        return min(state.x + 1, 36) / state.n_steps
+        return state.x / state.n_steps
         # }}}
 
 
@@ -263,5 +265,8 @@ if __name__ == "__main__":
     parser.add_argument("-rs", "--random-start", action="store_true")
     parser.add_argument("-s", "--supplies", nargs=len(TrackBot.SUPPLY_XS), type=int)
     args = parser.parse_args()
-    bot = TrackBot(args)
-    bot.play()
+
+    bots = [TrackBot(args, play=True) for _ in range(10)]
+    bots = sorted(bots, key=lambda bot: bot.history[-1].score, reverse=True)
+    for bot in bots[:3]:
+        bot.draw()
