@@ -179,9 +179,9 @@ class TrackBot:
                 if new_state.n_steps % 5 == 1:
                     new_state.used_track_ids = [new_state.used_track_ids[-1]]
             else:  # 對抗賽
-                # maintain the 3 tracks (before, on and after the bot) in `used_track_ids`
-                if len(new_state.used_track_ids) > 3:
-                    new_state.used_track_ids.pop(0)
+                # maintain the 1 tracks (on) in `used_track_ids` after the first four tracks
+                if new_state.n_steps >= 4:
+                    new_state.used_track_ids = [new_state.used_track_ids[-1]]
             new_state.score = self.score(new_state)
 
             # validate the new state
