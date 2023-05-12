@@ -131,7 +131,8 @@ class TrackBot:
             f"{state.n_steps} tracks, {state.n_cells} cells, score: {state.score:.2f}"
         )
 
-        HIGHLIGHT_NUMBERS = ["⓪ ", "① ", "② ", "③ ", "④ ", "⑤ ", "⑥ ", "⑦ ", "⑧ ", "⑨ "]
+        # HIGHLIGHT_NUMBERS = ["⓪ ", "① ", "② ", "③ ", "④ ", "⑤ ", "⑥ ", "⑦ ", "⑧ ", "⑨ "]
+        HIGHLIGHT_NUMBERS = "零一二三四五六七八九"
         NUMBERS = "０１２３４５６７８９"
         canvas = [["."] * self.args.map_width for _ in range(self.args.map_height)]
         for state in self.history[1:]:
